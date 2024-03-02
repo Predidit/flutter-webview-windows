@@ -1,3 +1,7 @@
+# what's new about the fork
+
+Add GetCookie API to solve the limit of Execscript (Can't access cookie marked as HTTPOnly).
+
 # webview_windows
 
 [![CI](https://github.com/jnschulze/flutter-webview-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/jnschulze/flutter-webview-windows/actions/workflows/ci.yml)
