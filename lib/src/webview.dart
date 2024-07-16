@@ -563,12 +563,13 @@ class WebviewController extends ValueNotifier<WebviewValue> {
 
   /// Sets the surface size to the provided [size].
   Future<void> _setSize(Size size, double scaleFactor) async {
+    /// add placeholder to avoid mouse freeze
     if (_isDisposed) {
       return;
     }
     assert(value.isInitialized);
     return _methodChannel
-        .invokeMethod('setSize', [size.width, size.height, scaleFactor]);
+        .invokeMethod('setSize', [size.width > 1 ? size.width : 1.0, size.height > 1 ? size.height : 1.0, scaleFactor]);
   }
 }
 
