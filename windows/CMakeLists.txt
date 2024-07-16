@@ -8,6 +8,9 @@ message(VERBOSE "CMake system version is ${CMAKE_SYSTEM_VERSION} (using SDK ${CM
 
 project(${PROJECT_NAME} LANGUAGES CXX)
 
+# Deal with MSVC incompatiblity
+add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+
 # This value is used when generating builds using this plugin, so it must
 # not be changed
 set(PLUGIN_NAME "webview_windows_plugin")
