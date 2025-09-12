@@ -293,10 +293,48 @@ void Webview::RegisterEventHandlers() {
           [this](ICoreWebView2* sender,
                  ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
             wil::unique_cotaskmem_string wmessage;
-            if (web_message_received_callback_ &&
-                args->get_WebMessageAsJson(&wmessage) == S_OK) {
+            if (args->get_WebMessageAsJson(&wmessage) == S_OK) {
               const std::string message = util::Utf8FromUtf16(wmessage.get());
-              web_message_received_callback_(message);
+              printf("DEBUG: Received WebMessage: %s\n", message.c_str());
+              fflush(stdout);
+              
+              // Parse JSON to check for M3U detection message
+              if (message.find("\"type\":\"M3UDetected\"") != std::string::npos) {
+                printf("DEBUG: M3U detection message received!\n");
+                fflush(stdout);
+                
+                // Simple JSON parsing to extract M3U data
+                size_t url_start = message.find("\"url\":\"") + 7;
+                size_t url_end = message.find("\"", url_start);
+                std::string url = message.substr(url_start, url_end - url_start);
+                
+                size_t method_start = message.find("\"method\":\"") + 10;
+                size_t method_end = message.find("\"", method_start);
+                std::string method = message.substr(method_start, method_end - method_start);
+                
+                size_t body_start = message.find("\"responseBody\":\"") + 16;
+                size_t body_end = message.rfind("\"");
+                std::string response_body = message.substr(body_start, body_end - body_start);
+                
+                printf("DEBUG: Parsed M3U data - URL: %s, Method: %s, Body length: %zu\n", 
+                       url.c_str(), method.c_str(), response_body.length());
+                fflush(stdout);
+                
+                // Call the M3U callback
+                if (web_resource_response_received_callback_) {
+                  printf("DEBUG: Calling M3U callback...\n");
+                  fflush(stdout);
+                  web_resource_response_received_callback_(url, method, response_body);
+                } else {
+                  printf("DEBUG: No M3U callback set!\n");
+                  fflush(stdout);
+                }
+              }
+              
+              // Also call the original web message callback
+              if (web_message_received_callback_) {
+                web_message_received_callback_(message);
+              }
             }
 
             return S_OK;
@@ -371,6 +409,80 @@ void Webview::RegisterEventHandlers() {
           })
           .Get(),
       &event_registrations_.contains_fullscreen_element_changed_token_);
+
+  // Add web resource response received event to monitor M3U files based on response content
+  wil::com_ptr<ICoreWebView2_2> webview2;
+  webview2 = webview_.try_query<ICoreWebView2_2>();
+  if (webview2) {
+    webview2->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+    webview2->add_WebResourceResponseReceived(
+        Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
+            [this](ICoreWebView2* sender,
+                   ICoreWebView2WebResourceResponseReceivedEventArgs* args) -> HRESULT {
+              if (!web_resource_response_received_callback_) {
+                return S_OK;
+              }
+
+              wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+              wil::com_ptr<ICoreWebView2WebResourceResponseView> response;
+              
+              if (FAILED(args->get_Request(&request)) || FAILED(args->get_Response(&response))) {
+                return S_OK;
+              }
+
+              wil::unique_cotaskmem_string uri, method;
+              if (FAILED(request->get_Uri(&uri)) || FAILED(request->get_Method(&method))) {
+                return S_OK;
+              }
+
+              std::string url = util::Utf8FromUtf16(uri.get());
+              std::string http_method = util::Utf8FromUtf16(method.get());
+
+              // Get response content using GetContent method
+              response->GetContent(
+                  Callback<ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
+                      [this, url, http_method](HRESULT result, IStream* content_stream) -> HRESULT {
+                        if (FAILED(result) || !content_stream) {
+                          return S_OK;
+                        }
+                        
+                        // Read the first part of the response to check for M3U header
+                        char buffer[8192] = {0};
+                        ULONG bytes_read = 0;
+                        
+                        if (SUCCEEDED(content_stream->Read(buffer, sizeof(buffer) - 1, &bytes_read)) && bytes_read > 0) {
+                          buffer[bytes_read] = '\0';
+                          std::string content(buffer, bytes_read);
+                          
+                          // Check ONLY if content starts with exactly "#EXTM3U" (first 7 characters)
+                          if (content.length() >= 7 && content.substr(0, 7) == "#EXTM3U") {
+                            // Call the callback for this M3U content
+                            if (web_resource_response_received_callback_) {
+                              web_resource_response_received_callback_(url, http_method, content);
+                            }
+                          }
+                        }
+                        
+                        return S_OK;
+                      }).Get());
+                      
+              return S_OK;
+            })
+            .Get(),
+        &event_registrations_.web_resource_response_received_token_);
+  } else {
+    // Fallback to WebResourceRequested for older WebView2 versions (content inspection not available)
+    webview_->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+    webview_->add_WebResourceRequested(
+        Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+            [this](ICoreWebView2* sender,
+                   ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+              // In fallback mode, we can only monitor URLs but cannot check response content
+              return S_OK;
+            })
+            .Get(),
+        &event_registrations_.web_resource_requested_token_);
+  }
 }
 
 void Webview::SetSurfaceSize(size_t width, size_t height, float scale_factor) {

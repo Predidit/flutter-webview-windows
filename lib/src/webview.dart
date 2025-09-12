@@ -159,6 +159,15 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Stream<bool> get containsFullScreenElementChanged =>
       _containsFullScreenElementChangedStreamController.stream;
 
+  final StreamController<Map<String, String>>
+      _onM3USourceLoadedStreamController =
+      StreamController<Map<String, String>>.broadcast();
+
+  /// A stream reflecting when M3U source files are loaded with #ext content.
+  /// The stream provides a map with 'url', 'method', and 'responseBody' keys.
+  Stream<Map<String, String>> get onM3USourceLoaded =>
+      _onM3USourceLoadedStreamController.stream;
+
   WebviewController() : super(WebviewValue.uninitialized());
 
   /// Initializes the underlying platform view.
@@ -213,6 +222,15 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             break;
           case 'containsFullScreenElementChanged':
             _containsFullScreenElementChangedStreamController.add(map['value']);
+            break;
+          case 'onM3USourceLoaded':
+            final value = map['value'] as Map<dynamic, dynamic>;
+            final m3uData = <String, String>{
+              'url': value['url'] as String,
+              'method': value['method'] as String,
+              'responseBody': value['responseBody'] as String,
+            };
+            _onM3USourceLoadedStreamController.add(m3uData);
             break;
         }
       });

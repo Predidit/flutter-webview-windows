@@ -300,6 +300,21 @@ void WebviewBridge::RegisterEventHandlers() {
              contains_fullscreen_element}});
         EmitEvent(event);
       });
+
+  webview_->OnWebResourceResponseReceived(
+      [this](const std::string& url, const std::string& method, const std::string& response_body) {
+        const auto event = flutter::EncodableValue(flutter::EncodableMap{
+            {flutter::EncodableValue(kEventType),
+             flutter::EncodableValue("onM3USourceLoaded")},
+            {flutter::EncodableValue(kEventValue), 
+             flutter::EncodableValue(flutter::EncodableMap{
+                 {flutter::EncodableValue("url"), flutter::EncodableValue(url)},
+                 {flutter::EncodableValue("method"), flutter::EncodableValue(method)},
+                 {flutter::EncodableValue("responseBody"), flutter::EncodableValue(response_body)},
+             })}});
+        
+        EmitEvent(event);
+      });
 }
 
 void WebviewBridge::OnPermissionRequested(
