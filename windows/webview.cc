@@ -410,7 +410,7 @@ void Webview::RegisterEventHandlers() {
           .Get(),
       &event_registrations_.contains_fullscreen_element_changed_token_);
 
-  // Add web resource response received event to monitor M3U files based on response content
+  // Add web resource response received event to monitor M3U files based on response content and video files based on content-type
   wil::com_ptr<ICoreWebView2_2> webview2;
   webview2 = webview_.try_query<ICoreWebView2_2>();
   if (webview2) {
@@ -419,7 +419,7 @@ void Webview::RegisterEventHandlers() {
         Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
             [this](ICoreWebView2* sender,
                    ICoreWebView2WebResourceResponseReceivedEventArgs* args) -> HRESULT {
-              if (!web_resource_response_received_callback_) {
+              if (!web_resource_response_received_callback_ && !video_source_loaded_callback_) {
                 return S_OK;
               }
 
@@ -438,33 +438,49 @@ void Webview::RegisterEventHandlers() {
               std::string url = util::Utf8FromUtf16(uri.get());
               std::string http_method = util::Utf8FromUtf16(method.get());
 
-              // Get response content using GetContent method
-              response->GetContent(
-                  Callback<ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
-                      [this, url, http_method](HRESULT result, IStream* content_stream) -> HRESULT {
-                        if (FAILED(result) || !content_stream) {
-                          return S_OK;
-                        }
-                        
-                        // Read the first part of the response to check for M3U header
-                        char buffer[8192] = {0};
-                        ULONG bytes_read = 0;
-                        
-                        if (SUCCEEDED(content_stream->Read(buffer, sizeof(buffer) - 1, &bytes_read)) && bytes_read > 0) {
-                          buffer[bytes_read] = '\0';
-                          std::string content(buffer, bytes_read);
+              // Get response headers to check content-type for video detection
+              wil::com_ptr<ICoreWebView2HttpResponseHeaders> headers;
+              if (SUCCEEDED(response->get_Headers(&headers))) {
+                wil::unique_cotaskmem_string content_type;
+                if (SUCCEEDED(headers->GetHeader(L"content-type", &content_type)) && content_type) {
+                  std::string content_type_str = util::Utf8FromUtf16(content_type.get());
+                  
+                  // Check if content-type contains "video/"
+                  if (content_type_str.find("video/") != std::string::npos && video_source_loaded_callback_) {
+                    video_source_loaded_callback_(url, http_method, content_type_str);
+                  }
+                }
+              }
+
+              // Get response content using GetContent method for M3U detection
+              if (web_resource_response_received_callback_) {
+                response->GetContent(
+                    Callback<ICoreWebView2WebResourceResponseViewGetContentCompletedHandler>(
+                        [this, url, http_method](HRESULT result, IStream* content_stream) -> HRESULT {
+                          if (FAILED(result) || !content_stream) {
+                            return S_OK;
+                          }
                           
-                          // Check ONLY if content starts with exactly "#EXTM3U" (first 7 characters)
-                          if (content.length() >= 7 && content.substr(0, 7) == "#EXTM3U") {
-                            // Call the callback for this M3U content
-                            if (web_resource_response_received_callback_) {
-                              web_resource_response_received_callback_(url, http_method, content);
+                          // Read the first part of the response to check for M3U header
+                          char buffer[8192] = {0};
+                          ULONG bytes_read = 0;
+                          
+                          if (SUCCEEDED(content_stream->Read(buffer, sizeof(buffer) - 1, &bytes_read)) && bytes_read > 0) {
+                            buffer[bytes_read] = '\0';
+                            std::string content(buffer, bytes_read);
+                            
+                            // Check ONLY if content starts with exactly "#EXTM3U" (first 7 characters)
+                            if (content.length() >= 7 && content.substr(0, 7) == "#EXTM3U") {
+                              // Call the callback for this M3U content
+                              if (web_resource_response_received_callback_) {
+                                web_resource_response_received_callback_(url, http_method, content);
+                              }
                             }
                           }
-                        }
-                        
-                        return S_OK;
-                      }).Get());
+                          
+                          return S_OK;
+                        }).Get());
+              }
                       
               return S_OK;
             })

@@ -168,6 +168,15 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Stream<Map<String, String>> get onM3USourceLoaded =>
       _onM3USourceLoadedStreamController.stream;
 
+  final StreamController<Map<String, String>>
+      _onVideoSourceLoadedStreamController =
+      StreamController<Map<String, String>>.broadcast();
+
+  /// A stream reflecting when video source files are loaded.
+  /// The stream provides a map with 'url', 'method', and 'contentType' keys.
+  Stream<Map<String, String>> get onVideoSourceLoaded =>
+      _onVideoSourceLoadedStreamController.stream;
+
   WebviewController() : super(WebviewValue.uninitialized());
 
   /// Initializes the underlying platform view.
@@ -231,6 +240,15 @@ class WebviewController extends ValueNotifier<WebviewValue> {
               'responseBody': value['responseBody'] as String,
             };
             _onM3USourceLoadedStreamController.add(m3uData);
+            break;
+          case 'onVideoSourceLoaded':
+            final value = map['value'] as Map<dynamic, dynamic>;
+            final videoData = <String, String>{
+              'url': value['url'] as String,
+              'method': value['method'] as String,
+              'contentType': value['contentType'] as String,
+            };
+            _onVideoSourceLoadedStreamController.add(videoData);
             break;
         }
       });
