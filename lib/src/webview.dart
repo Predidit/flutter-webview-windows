@@ -177,6 +177,15 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Stream<Map<String, String>> get onVideoSourceLoaded =>
       _onVideoSourceLoadedStreamController.stream;
 
+  final StreamController<Map<String, String>>
+      _onSourceLoadedStreamController =
+      StreamController<Map<String, String>>.broadcast();
+
+  /// A stream reflecting when any source files are loaded (for debugging).
+  /// The stream provides a map with 'url', 'method', and 'contentType' keys.
+  Stream<Map<String, String>> get onSourceLoaded =>
+      _onSourceLoadedStreamController.stream;
+
   WebviewController() : super(WebviewValue.uninitialized());
 
   /// Initializes the underlying platform view.
@@ -250,6 +259,15 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             };
             _onVideoSourceLoadedStreamController.add(videoData);
             break;
+          case 'onSourceLoaded':
+            final value = map['value'] as Map<dynamic, dynamic>;
+            final sourceData = <String, String>{
+              'url': value['url'] as String,
+              'method': value['method'] as String,
+              'contentType': value['contentType'] as String,
+            };
+            _onSourceLoadedStreamController.add(sourceData);
+            break;
         }
       });
 
@@ -304,6 +322,21 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (!_isDisposed) {
       _isDisposed = true;
       await _eventStreamSubscription?.cancel();
+      
+      // Close all stream controllers
+      await _urlStreamController.close();
+      await _loadingStateStreamController.close();
+      await _onLoadErrorStreamController.close();
+      await _historyChangedStreamController.close();
+      await _securityStateChangedStreamController.close();
+      await _titleStreamController.close();
+      await _cursorStreamController.close();
+      await _webMessageStreamController.close();
+      await _containsFullScreenElementChangedStreamController.close();
+      await _onM3USourceLoadedStreamController.close();
+      await _onVideoSourceLoadedStreamController.close();
+      await _onSourceLoadedStreamController.close();
+      
       await _pluginChannel.invokeMethod('dispose', _textureId);
     }
     super.dispose();

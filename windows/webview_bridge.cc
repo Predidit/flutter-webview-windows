@@ -330,6 +330,21 @@ void WebviewBridge::RegisterEventHandlers() {
         
         EmitEvent(event);
       });
+
+  webview_->OnSourceLoaded(
+      [this](const std::string& url, const std::string& method, const std::string& content_type) {
+        const auto event = flutter::EncodableValue(flutter::EncodableMap{
+            {flutter::EncodableValue(kEventType),
+             flutter::EncodableValue("onSourceLoaded")},
+            {flutter::EncodableValue(kEventValue), 
+             flutter::EncodableValue(flutter::EncodableMap{
+                 {flutter::EncodableValue("url"), flutter::EncodableValue(url)},
+                 {flutter::EncodableValue("method"), flutter::EncodableValue(method)},
+                 {flutter::EncodableValue("contentType"), flutter::EncodableValue(content_type)},
+             })}});
+        
+        EmitEvent(event);
+      });
 }
 
 void WebviewBridge::OnPermissionRequested(

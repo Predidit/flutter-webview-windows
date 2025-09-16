@@ -72,6 +72,12 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         _showVideoDialog(videoData);
       }));
 
+      // Listen for all source loads (debugging)
+      _subscriptions.add(_controller.onSourceLoaded.listen((sourceData) {
+        debugPrint(
+            'Source loaded: ${sourceData['url']} with content-type: ${sourceData['contentType']}, method: ${sourceData['method']}');
+      }));
+
       await _controller.setBackgroundColor(Colors.transparent);
       await _controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
       

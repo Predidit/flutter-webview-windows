@@ -419,7 +419,7 @@ void Webview::RegisterEventHandlers() {
         Callback<ICoreWebView2WebResourceResponseReceivedEventHandler>(
             [this](ICoreWebView2* sender,
                    ICoreWebView2WebResourceResponseReceivedEventArgs* args) -> HRESULT {
-              if (!web_resource_response_received_callback_ && !video_source_loaded_callback_) {
+              if (!web_resource_response_received_callback_ && !video_source_loaded_callback_ && !source_loaded_callback_) {
                 return S_OK;
               }
 
@@ -449,6 +449,21 @@ void Webview::RegisterEventHandlers() {
                   if (content_type_str.find("video/") != std::string::npos && video_source_loaded_callback_) {
                     video_source_loaded_callback_(url, http_method, content_type_str);
                   }
+                  
+                  // Call the general source loaded callback for all sources (debugging)
+                  if (source_loaded_callback_) {
+                    source_loaded_callback_(url, http_method, content_type_str);
+                  }
+                } else {
+                  // If no content-type header, still call the source loaded callback with empty content-type
+                  if (source_loaded_callback_) {
+                    source_loaded_callback_(url, http_method, "");
+                  }
+                }
+              } else {
+                // If headers retrieval failed, still call the source loaded callback
+                if (source_loaded_callback_) {
+                  source_loaded_callback_(url, http_method, "");
                 }
               }
 

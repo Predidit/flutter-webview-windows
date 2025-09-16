@@ -125,6 +125,9 @@ class Webview {
   typedef std::function<void(const std::string& url, const std::string& method, 
                              const std::string& content_type)>
       VideoSourceLoadedCallback;
+  typedef std::function<void(const std::string& url, const std::string& method, 
+                             const std::string& content_type)>
+      SourceLoadedCallback;
 
   ~Webview();
 
@@ -228,6 +231,10 @@ class Webview {
     video_source_loaded_callback_ = std::move(callback);
   }
 
+  void OnSourceLoaded(SourceLoadedCallback callback) {
+    source_loaded_callback_ = std::move(callback);
+  }
+
  private:
   HWND hwnd_;
   bool owns_window_;
@@ -266,6 +273,7 @@ class Webview {
       contains_fullscreen_element_changed_callback_;
   WebResourceResponseReceivedCallback web_resource_response_received_callback_;
   VideoSourceLoadedCallback video_source_loaded_callback_;
+  SourceLoadedCallback source_loaded_callback_;
 
   Webview(
       wil::com_ptr<ICoreWebView2CompositionController> composition_controller,
