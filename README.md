@@ -1,6 +1,11 @@
 # what's new about the fork
 
-Add GetCookie API to solve the limit of Execscript (Can't access cookie marked as HTTPOnly).
+- `GetCookie` API to solve the limit of Execscript (Can't access cookie marked as HTTPOnly).
+- `onM3USourceLoaded` API to notify when m3u8 source is loaded. m3u8 body is also provided.
+- `onVideoSourceLoaded` API to notify when video source is loaded.
+
+> [!NOTE]
+> The m3u8 / video parser feature is still experimental. And it requires specific webview2 flags which may be removed in future webview2 releases. Please test it carefully before using it in production.
 
 # webview_windows
 

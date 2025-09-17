@@ -14,11 +14,17 @@ std::unique_ptr<WebviewHost> WebviewHost::Create(
     WebviewPlatform* platform, std::optional<std::wstring> user_data_directory,
     std::optional<std::wstring> browser_exe_path,
     std::optional<std::string> arguments) {
-  wil::com_ptr<CoreWebView2EnvironmentOptions> opts;
+  wil::com_ptr<CoreWebView2EnvironmentOptions> opts = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
+  
+  // Add those required WebView2 feature flags for m3u8 parser.
+  std::wstring defaultArgs = L"--disable-site-isolation-trials --disable-web-security --msEdgeWebViewApplyWebResourceRequestedFilterForOOPIFs";
+  
   if (arguments.has_value()) {
-    opts = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
     std::wstring warguments(arguments.value().begin(), arguments.value().end());
-    opts->put_AdditionalBrowserArguments(warguments.c_str());
+    std::wstring combinedArgs = defaultArgs + L" " + warguments;
+    opts->put_AdditionalBrowserArguments(combinedArgs.c_str());
+  } else {
+    opts->put_AdditionalBrowserArguments(defaultArgs.c_str());
   }
 
   std::promise<HRESULT> result_promise;
