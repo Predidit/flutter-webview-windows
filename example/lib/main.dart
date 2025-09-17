@@ -59,8 +59,28 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         windowManager.setFullScreen(flag);
       }));
 
+      // Listen for M3U source files being loaded
+      _subscriptions.add(_controller.onM3USourceLoaded.listen((data) {
+        debugPrint('M3U Source Loaded: ${data['url']}');
+        _showM3UDialog(data);
+      }));
+
+      // Listen for video source detections
+      _subscriptions.add(_controller.onVideoSourceLoaded.listen((videoData) {
+        debugPrint(
+            'Video detected: ${videoData['url']} with content-type: ${videoData['contentType']}');
+        _showVideoDialog(videoData);
+      }));
+
+      // Listen for all source loads (debugging)
+      _subscriptions.add(_controller.onSourceLoaded.listen((sourceData) {
+        debugPrint(
+            'Source loaded: ${sourceData['url']} with content-type: ${sourceData['contentType']}, method: ${sourceData['method']}');
+      }));
+
       await _controller.setBackgroundColor(Colors.transparent);
       await _controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
+      
       await _controller.loadUrl('https://flutter.dev');
 
       if (!mounted) return;
@@ -222,6 +242,80 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     );
 
     return decision ?? WebviewPermissionDecision.none;
+  }
+
+  void _showVideoDialog(Map<String, String> data) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Video Source Loaded'),
+        content: Container(
+          width: double.maxFinite,
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('URL: ${data['url']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Content-Type: ${data['contentType']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showM3UDialog(Map<String, String> data) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('M3U Source Loaded'),
+        content: Container(
+          width: double.maxFinite,
+          constraints: const BoxConstraints(maxHeight: 400),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('URL: ${data['url']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Method: ${data['method']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('Response Body:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    data['responseBody'] ?? '',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

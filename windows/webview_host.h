@@ -52,6 +52,10 @@ class WebviewHost {
     return compositor_;
   }
 
+  wil::com_ptr<ICoreWebView2Environment3> GetEnvironment() const {
+    return webview_env_;
+  }
+
  private:
   winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor_;
   wil::com_ptr<ICoreWebView2Environment3> webview_env_;

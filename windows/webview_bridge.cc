@@ -300,6 +300,51 @@ void WebviewBridge::RegisterEventHandlers() {
              contains_fullscreen_element}});
         EmitEvent(event);
       });
+
+  webview_->OnWebResourceResponseReceived(
+      [this](const std::string& url, const std::string& method, const std::string& response_body) {
+        const auto event = flutter::EncodableValue(flutter::EncodableMap{
+            {flutter::EncodableValue(kEventType),
+             flutter::EncodableValue("onM3USourceLoaded")},
+            {flutter::EncodableValue(kEventValue), 
+             flutter::EncodableValue(flutter::EncodableMap{
+                 {flutter::EncodableValue("url"), flutter::EncodableValue(url)},
+                 {flutter::EncodableValue("method"), flutter::EncodableValue(method)},
+                 {flutter::EncodableValue("responseBody"), flutter::EncodableValue(response_body)},
+             })}});
+        
+        EmitEvent(event);
+      });
+
+  webview_->OnVideoSourceLoaded(
+      [this](const std::string& url, const std::string& method, const std::string& content_type) {
+        const auto event = flutter::EncodableValue(flutter::EncodableMap{
+            {flutter::EncodableValue(kEventType),
+             flutter::EncodableValue("onVideoSourceLoaded")},
+            {flutter::EncodableValue(kEventValue), 
+             flutter::EncodableValue(flutter::EncodableMap{
+                 {flutter::EncodableValue("url"), flutter::EncodableValue(url)},
+                 {flutter::EncodableValue("method"), flutter::EncodableValue(method)},
+                 {flutter::EncodableValue("contentType"), flutter::EncodableValue(content_type)},
+             })}});
+        
+        EmitEvent(event);
+      });
+
+  webview_->OnSourceLoaded(
+      [this](const std::string& url, const std::string& method, const std::string& content_type) {
+        const auto event = flutter::EncodableValue(flutter::EncodableMap{
+            {flutter::EncodableValue(kEventType),
+             flutter::EncodableValue("onSourceLoaded")},
+            {flutter::EncodableValue(kEventValue), 
+             flutter::EncodableValue(flutter::EncodableMap{
+                 {flutter::EncodableValue("url"), flutter::EncodableValue(url)},
+                 {flutter::EncodableValue("method"), flutter::EncodableValue(method)},
+                 {flutter::EncodableValue("contentType"), flutter::EncodableValue(content_type)},
+             })}});
+        
+        EmitEvent(event);
+      });
 }
 
 void WebviewBridge::OnPermissionRequested(
