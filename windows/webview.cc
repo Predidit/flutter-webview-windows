@@ -90,6 +90,97 @@ Webview::Webview(
 }
 
 Webview::~Webview() {
+  // Remove all registered event handlers to prevent resource leaks
+  if (webview_) {
+    if (event_registrations_.web_resource_response_received_token_.value != 0) {
+      wil::com_ptr<ICoreWebView2_2> webview2;
+      webview2 = webview_.try_query<ICoreWebView2_2>();
+      if (webview2) {
+        webview2->remove_WebResourceResponseReceived(event_registrations_.web_resource_response_received_token_);
+      }
+    }
+    
+    if (event_registrations_.web_resource_requested_token_.value != 0) {
+      webview_->remove_WebResourceRequested(event_registrations_.web_resource_requested_token_);
+    }
+
+    if (event_registrations_.source_changed_token_.value != 0) {
+      webview_->remove_SourceChanged(event_registrations_.source_changed_token_);
+    }
+    
+    if (event_registrations_.content_loading_token_.value != 0) {
+      webview_->remove_ContentLoading(event_registrations_.content_loading_token_);
+    }
+    
+    if (event_registrations_.navigation_completed_token_.value != 0) {
+      webview_->remove_NavigationCompleted(event_registrations_.navigation_completed_token_);
+    }
+    
+    if (event_registrations_.history_changed_token_.value != 0) {
+      webview_->remove_HistoryChanged(event_registrations_.history_changed_token_);
+    }
+    
+    if (event_registrations_.document_title_changed_token_.value != 0) {
+      webview_->remove_DocumentTitleChanged(event_registrations_.document_title_changed_token_);
+    }
+    
+    if (event_registrations_.web_message_received_token_.value != 0) {
+      webview_->remove_WebMessageReceived(event_registrations_.web_message_received_token_);
+    }
+    
+    if (event_registrations_.permission_requested_token_.value != 0) {
+      webview_->remove_PermissionRequested(event_registrations_.permission_requested_token_);
+    }
+    
+    if (event_registrations_.contains_fullscreen_element_changed_token_.value != 0) {
+      webview_->remove_ContainsFullScreenElementChanged(event_registrations_.contains_fullscreen_element_changed_token_);
+    }
+    
+    if (event_registrations_.new_windows_requested_token_.value != 0) {
+      webview_->remove_NewWindowRequested(event_registrations_.new_windows_requested_token_);
+    }
+
+    if (devtools_protocol_event_receiver_) {
+      devtools_protocol_event_receiver_->remove_DevToolsProtocolEventReceived(event_registrations_.devtools_protocol_event_token_);
+    }
+  }
+
+  if (composition_controller_) {
+    if (event_registrations_.cursor_changed_token_.value != 0) {
+      composition_controller_->remove_CursorChanged(event_registrations_.cursor_changed_token_);
+    }
+  }
+
+  if (webview_controller_) {
+    if (event_registrations_.got_focus_token_.value != 0) {
+      webview_controller_->remove_GotFocus(event_registrations_.got_focus_token_);
+    }
+    
+    if (event_registrations_.lost_focus_token_.value != 0) {
+      webview_controller_->remove_LostFocus(event_registrations_.lost_focus_token_);
+    }
+  }
+
+  if (devtools_protocol_event_receiver_) {
+    devtools_protocol_event_receiver_.reset();
+  }
+  
+  if (settings2_) {
+    settings2_.reset();
+  }
+  
+  if (webview_) {
+    webview_.reset();
+  }
+  
+  if (webview_controller_) {
+    webview_controller_.reset();
+  }
+  
+  if (composition_controller_) {
+    composition_controller_.reset();
+  }
+
   if (owns_window_) {
     DestroyWindow(hwnd_);
   }
@@ -295,14 +386,9 @@ void Webview::RegisterEventHandlers() {
             wil::unique_cotaskmem_string wmessage;
             if (args->get_WebMessageAsJson(&wmessage) == S_OK) {
               const std::string message = util::Utf8FromUtf16(wmessage.get());
-              printf("DEBUG: Received WebMessage: %s\n", message.c_str());
-              fflush(stdout);
               
               // Parse JSON to check for M3U detection message
               if (message.find("\"type\":\"M3UDetected\"") != std::string::npos) {
-                printf("DEBUG: M3U detection message received!\n");
-                fflush(stdout);
-                
                 // Simple JSON parsing to extract M3U data
                 size_t url_start = message.find("\"url\":\"") + 7;
                 size_t url_end = message.find("\"", url_start);
@@ -316,18 +402,9 @@ void Webview::RegisterEventHandlers() {
                 size_t body_end = message.rfind("\"");
                 std::string response_body = message.substr(body_start, body_end - body_start);
                 
-                printf("DEBUG: Parsed M3U data - URL: %s, Method: %s, Body length: %zu\n", 
-                       url.c_str(), method.c_str(), response_body.length());
-                fflush(stdout);
-                
                 // Call the M3U callback
                 if (web_resource_response_received_callback_) {
-                  printf("DEBUG: Calling M3U callback...\n");
-                  fflush(stdout);
                   web_resource_response_received_callback_(url, method, response_body);
-                } else {
-                  printf("DEBUG: No M3U callback set!\n");
-                  fflush(stdout);
                 }
               }
               

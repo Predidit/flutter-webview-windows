@@ -177,8 +177,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Stream<Map<String, String>> get onVideoSourceLoaded =>
       _onVideoSourceLoadedStreamController.stream;
 
-  final StreamController<Map<String, String>>
-      _onSourceLoadedStreamController =
+  final StreamController<Map<String, String>> _onSourceLoadedStreamController =
       StreamController<Map<String, String>>.broadcast();
 
   /// A stream reflecting when any source files are loaded (for debugging).
@@ -321,24 +320,28 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
+
       await _eventStreamSubscription?.cancel();
-      
-      // Close all stream controllers
-      await _urlStreamController.close();
-      await _loadingStateStreamController.close();
-      await _onLoadErrorStreamController.close();
-      await _historyChangedStreamController.close();
-      await _securityStateChangedStreamController.close();
-      await _titleStreamController.close();
-      await _cursorStreamController.close();
-      await _webMessageStreamController.close();
-      await _containsFullScreenElementChangedStreamController.close();
-      await _onM3USourceLoadedStreamController.close();
-      await _onVideoSourceLoadedStreamController.close();
-      await _onSourceLoadedStreamController.close();
-      
+
+      // Close all stream controllers safely without waiting for completion
+      try {
+        _urlStreamController.close();
+        _loadingStateStreamController.close();
+        _onLoadErrorStreamController.close();
+        _historyChangedStreamController.close();
+        _securityStateChangedStreamController.close();
+        _titleStreamController.close();
+        _cursorStreamController.close();
+        _webMessageStreamController.close();
+        _containsFullScreenElementChangedStreamController.close();
+        _onM3USourceLoadedStreamController.close();
+        _onVideoSourceLoadedStreamController.close();
+        _onSourceLoadedStreamController.close();
+      } catch (_) {}
+
       await _pluginChannel.invokeMethod('dispose', _textureId);
     }
+
     super.dispose();
   }
 
@@ -637,8 +640,11 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
     assert(value.isInitialized);
-    return _methodChannel
-        .invokeMethod('setSize', [size.width > 1 ? size.width : 1.0, size.height > 1 ? size.height : 1.0, scaleFactor]);
+    return _methodChannel.invokeMethod('setSize', [
+      size.width > 1 ? size.width : 1.0,
+      size.height > 1 ? size.height : 1.0,
+      scaleFactor
+    ]);
   }
 }
 
