@@ -43,7 +43,7 @@ class WebviewHost {
       std::optional<std::string> arguments = std::nullopt);
 
   void CreateWebview(HWND hwnd, bool offscreen_only, bool owns_window,
-                     WebviewCreationCallback callback);
+                     bool is_headless, WebviewCreationCallback callback);
 
   void CreateWebViewPointerInfo(PointerInfoCreationCallback cb);
 

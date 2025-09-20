@@ -58,11 +58,12 @@ inline COREWEBVIEW2_PERMISSION_STATE WebViewPermissionStateToCW2PermissionState(
 
 Webview::Webview(
     wil::com_ptr<ICoreWebView2CompositionController> composition_controller,
-    WebviewHost* host, HWND hwnd, bool owns_window, bool offscreen_only)
+    WebviewHost* host, HWND hwnd, bool owns_window, bool offscreen_only, bool is_headless)
     : composition_controller_(std::move(composition_controller)),
       host_(host),
       hwnd_(hwnd),
-      owns_window_(owns_window) {
+      owns_window_(owns_window),
+      is_headless_(is_headless) {
   webview_controller_ =
       composition_controller_.try_query<ICoreWebView2Controller3>();
 
@@ -86,7 +87,7 @@ Webview::Webview(
   EnableSecurityUpdates();
   RegisterEventHandlers();
 
-  is_valid_ = CreateSurface(host->compositor(), hwnd, offscreen_only);
+  is_valid_ = CreateSurface(host->compositor(), hwnd, offscreen_only, is_headless);
 }
 
 Webview::~Webview() {
@@ -188,7 +189,7 @@ Webview::~Webview() {
 
 bool Webview::CreateSurface(
     winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor,
-    HWND hwnd, bool offscreen_only) {
+    HWND hwnd, bool offscreen_only, bool is_headless) {
   winrt::com_ptr<ABI::Windows::UI::Composition::IContainerVisual> root;
   if (FAILED(compositor->CreateContainerVisual(root.put()))) {
     return false;
@@ -199,7 +200,7 @@ bool Webview::CreateSurface(
 
   // initial size. doesn't matter as we resize the surface anyway.
   surface_->put_Size({1280, 720});
-  surface_->put_IsVisible(true);
+  surface_->put_IsVisible(!is_headless);
 
   // Create on-screen window for debugging purposes
   if (!offscreen_only) {
@@ -228,7 +229,7 @@ bool Webview::CreateSurface(
   children->InsertAtTop(webview_visual.get());
   composition_controller_->put_RootVisualTarget(webview_visual2.get());
 
-  webview_controller_->put_IsVisible(true);
+  webview_controller_->put_IsVisible(!is_headless);
 
   return true;
 }
@@ -1004,7 +1005,7 @@ bool Webview::Resume() {
     return false;
   }
   return webview->Resume() == S_OK &&
-         webview_controller_->put_IsVisible(true) == S_OK;
+         webview_controller_->put_IsVisible(!is_headless_) == S_OK;
 }
 
 bool Webview::SetVirtualHostNameMapping(
