@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include "webview_bridge.h"
+#include "headless_webview_bridge.h"
 #include "webview_host.h"
 #include "webview_platform.h"
 #include "util/string_converter.h"
@@ -23,6 +24,8 @@ constexpr auto kMethodInitialize = "initialize";
 constexpr auto kMethodDispose = "dispose";
 constexpr auto kMethodInitializeEnvironment = "initializeEnvironment";
 constexpr auto kMethodGetWebViewVersion = "getWebViewVersion";
+constexpr auto kMethodCreateHeadless = "createHeadless";
+constexpr auto kMethodDisposeHeadless = "disposeHeadless";
 
 constexpr auto kErrorCodeInvalidId = "invalid_id";
 constexpr auto kErrorCodeEnvironmentCreationFailed =
@@ -58,6 +61,7 @@ class WebviewWindowsPlugin : public flutter::Plugin {
   std::unique_ptr<WebviewPlatform> platform_;
   std::unique_ptr<WebviewHost> webview_host_;
   std::unordered_map<int64_t, std::unique_ptr<WebviewBridge>> instances_;
+  std::unordered_map<std::string, std::unique_ptr<HeadlessWebviewBridge>> headless_instances_;
 
   WNDCLASS window_class_ = {};
   flutter::TextureRegistrar* textures_;
@@ -66,6 +70,8 @@ class WebviewWindowsPlugin : public flutter::Plugin {
   bool InitPlatform();
 
   void CreateWebviewInstance(
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>);
+  void CreateHeadlessWebviewInstance(
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>);
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
@@ -81,10 +87,20 @@ void WebviewWindowsPlugin::RegisterWithRegistrar(
           registrar->messenger(), "io.jns.webview.win",
           &flutter::StandardMethodCodec::GetInstance());
 
+  auto headless_channel =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          registrar->messenger(), "io.jns.webview.win.headless",
+          &flutter::StandardMethodCodec::GetInstance());
+
   auto plugin = std::make_unique<WebviewWindowsPlugin>(
       registrar->texture_registrar(), registrar->messenger());
 
   channel->SetMethodCallHandler(
+      [plugin_pointer = plugin.get()](const auto& call, auto result) {
+        plugin_pointer->HandleMethodCall(call, std::move(result));
+      });
+
+  headless_channel->SetMethodCallHandler(
       [plugin_pointer = plugin.get()](const auto& call, auto result) {
         plugin_pointer->HandleMethodCall(call, std::move(result));
       });
@@ -102,6 +118,7 @@ WebviewWindowsPlugin::WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
 
 WebviewWindowsPlugin::~WebviewWindowsPlugin() {
   instances_.clear();
+  headless_instances_.clear();
   UnregisterClass(window_class_.lpszClassName, nullptr);
 }
 
@@ -163,6 +180,21 @@ void WebviewWindowsPlugin::HandleMethodCall(
     return CreateWebviewInstance(std::move(result));
   }
 
+  if (method_call.method_name().compare(kMethodCreateHeadless) == 0) {
+    return CreateHeadlessWebviewInstance(std::move(result));
+  }
+
+  if (method_call.method_name().compare(kMethodDisposeHeadless) == 0) {
+    if (const auto webview_id = std::get_if<std::string>(method_call.arguments())) {
+      const auto it = headless_instances_.find(*webview_id);
+      if (it != headless_instances_.end()) {
+        headless_instances_.erase(it);
+        return result->Success();
+      }
+    }
+    return result->Error(kErrorCodeInvalidId);
+  }
+
   if (method_call.method_name().compare(kMethodDispose) == 0) {
     if (const auto texture_id = std::get_if<int64_t>(method_call.arguments())) {
       const auto it = instances_.find(*texture_id);
@@ -199,7 +231,7 @@ void WebviewWindowsPlugin::CreateWebviewInstance(
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
       shared_result = std::move(result);
   webview_host_->CreateWebview(
-      hwnd, true, true,
+      hwnd, true, true, false,
       [shared_result, this](std::unique_ptr<Webview> webview,
                             std::unique_ptr<WebviewCreationError> error) {
         if (!webview) {
@@ -223,6 +255,60 @@ void WebviewWindowsPlugin::CreateWebviewInstance(
         auto response = flutter::EncodableValue(flutter::EncodableMap{
             {flutter::EncodableValue("textureId"),
              flutter::EncodableValue(texture_id)},
+        });
+
+        shared_result->Success(response);
+      });
+}
+
+void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  if (!InitPlatform()) {
+    return result->Error(kErrorUnsupportedPlatform,
+                         "The platform is not supported");
+  }
+
+  if (!webview_host_) {
+    webview_host_ = std::move(WebviewHost::Create(
+        platform_.get(), platform_->GetDefaultDataDirectory()));
+    if (!webview_host_) {
+      return result->Error(kErrorCodeEnvironmentCreationFailed);
+    }
+  }
+
+  // Create a hidden window for the headless webview
+  auto hwnd = CreateWindowEx(0, window_class_.lpszClassName, L"", 0, CW_DEFAULT,
+                             CW_DEFAULT, 0, 0, HWND_MESSAGE, nullptr,
+                             window_class_.hInstance, nullptr);
+
+  std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
+      shared_result = std::move(result);
+  webview_host_->CreateWebview(
+      hwnd, true, true, true,
+      [shared_result, this](std::unique_ptr<Webview> webview,
+                            std::unique_ptr<WebviewCreationError> error) {
+        if (!webview) {
+          if (error) {
+            return shared_result->Error(
+                kErrorCodeWebviewCreationFailed,
+                std::format(
+                    "Creating the headless webview failed: {} (HRESULT: {:#010x})",
+                    error->message, error->hr));
+          }
+          return shared_result->Error(kErrorCodeWebviewCreationFailed,
+                                      "Creating the headless webview failed.");
+        }
+
+        auto bridge = std::make_unique<HeadlessWebviewBridge>(
+            messenger_, std::move(webview));
+        bridge->RegisterEventHandlers();
+        
+        auto webview_id = bridge->webview_id();
+        headless_instances_[webview_id] = std::move(bridge);
+
+        auto response = flutter::EncodableValue(flutter::EncodableMap{
+            {flutter::EncodableValue("webviewId"),
+             flutter::EncodableValue(webview_id)},
         });
 
         shared_result->Success(response);

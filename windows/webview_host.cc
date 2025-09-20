@@ -62,7 +62,7 @@ WebviewHost::WebviewHost(WebviewPlatform* platform,
 }
 
 void WebviewHost::CreateWebview(HWND hwnd, bool offscreen_only,
-                                bool owns_window,
+                                bool owns_window, bool is_headless,
                                 WebviewCreationCallback callback) {
   CreateWebViewCompositionController(
       hwnd, [=, self = this](
@@ -70,7 +70,7 @@ void WebviewHost::CreateWebview(HWND hwnd, bool offscreen_only,
                 std::unique_ptr<WebviewCreationError> error) {
         if (controller) {
           std::unique_ptr<Webview> webview(new Webview(
-              std::move(controller), self, hwnd, owns_window, offscreen_only));
+              std::move(controller), self, hwnd, owns_window, offscreen_only, is_headless));
           callback(std::move(webview), nullptr);
         } else {
           callback(nullptr, std::move(error));
