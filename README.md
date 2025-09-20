@@ -1,5 +1,6 @@
 # what's new about the fork
 
+- `HeadlessWebview` mode to run webview without any window or surface. Useful for background tasks like web scraping.
 - `GetCookie` API to solve the limit of Execscript (Can't access cookie marked as HTTPOnly).
 - `onM3USourceLoaded` API to notify when m3u8 source is loaded. m3u8 body is also provided.
 - `onVideoSourceLoaded` API to notify when video source is loaded.
