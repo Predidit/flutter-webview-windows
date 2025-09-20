@@ -44,6 +44,7 @@ add_library(${PLUGIN_NAME} SHARED
   "webview.cc"
   "webview_host.cc"
   "webview_bridge.cc"
+  "headless_webview_bridge.cc"
   "texture_bridge.cc"
   "texture_bridge_gpu.cc"
   "graphics_context.cc"
