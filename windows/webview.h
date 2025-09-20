@@ -238,6 +238,7 @@ class Webview {
  private:
   HWND hwnd_;
   bool owns_window_;
+  bool is_headless_;
   bool is_valid_ = false;
   float scale_factor_ = 1.0;
   wil::com_ptr<ICoreWebView2CompositionController> composition_controller_;
@@ -277,11 +278,11 @@ class Webview {
 
   Webview(
       wil::com_ptr<ICoreWebView2CompositionController> composition_controller,
-      WebviewHost* host, HWND hwnd, bool owns_window, bool offscreen_only);
+      WebviewHost* host, HWND hwnd, bool owns_window, bool offscreen_only, bool is_headless);
 
   bool CreateSurface(
       winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor,
-      HWND hwnd, bool offscreen_only);
+      HWND hwnd, bool offscreen_only, bool is_headless);
   void RegisterEventHandlers();
   void EnableSecurityUpdates();
   void SendScroll(double offset, bool horizontal);
