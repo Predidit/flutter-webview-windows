@@ -200,7 +200,7 @@ bool Webview::CreateSurface(
 
   // initial size. doesn't matter as we resize the surface anyway.
   surface_->put_Size({1280, 720});
-  surface_->put_IsVisible(!is_headless);
+  surface_->put_IsVisible(true);
 
   // Create on-screen window for debugging purposes
   if (!offscreen_only) {
@@ -229,7 +229,7 @@ bool Webview::CreateSurface(
   children->InsertAtTop(webview_visual.get());
   composition_controller_->put_RootVisualTarget(webview_visual2.get());
 
-  webview_controller_->put_IsVisible(!is_headless);
+  webview_controller_->put_IsVisible(true);
 
   return true;
 }
@@ -1005,7 +1005,7 @@ bool Webview::Resume() {
     return false;
   }
   return webview->Resume() == S_OK &&
-         webview_controller_->put_IsVisible(!is_headless_) == S_OK;
+         webview_controller_->put_IsVisible(true) == S_OK;
 }
 
 bool Webview::SetVirtualHostNameMapping(

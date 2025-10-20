@@ -8,9 +8,6 @@
 > [!NOTE]
 > The m3u8 / video parser feature is still experimental. And it requires specific webview2 flags which may be removed in future webview2 releases. Please test it carefully before using it in production.
 
-> [!NOTE]
-> The `HeadlessWebview` mode always keep gpu render inactive to save resources. But it leads to mp4 video will never loaded and `onVideoSourceLoaded` will never be called. m3u8 video should work fine.
-
 # webview_windows
 
 [![CI](https://github.com/jnschulze/flutter-webview-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/jnschulze/flutter-webview-windows/actions/workflows/ci.yml)
