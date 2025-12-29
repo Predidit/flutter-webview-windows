@@ -87,13 +87,16 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   }
 
   /// Disposes the underlying WebView environment and all associated webview
-  /// instances.
+  /// instances. This performs the most complete cleanup, releasing all native
+  /// resources including the WebView2 environment itself.
   ///
   /// After calling this method, you can call [initializeEnvironment] again
   /// with new parameters (e.g., different Chromium command line arguments).
   ///
-  /// Make sure all [WebviewController] instances are disposed before
-  /// calling this method, or they will be forcefully disposed.
+  /// Do not call this method while simultaneously calling [dispose]
+  /// on individual [WebviewController] instances, as this may cause resource
+  /// contention and lead to crashes. Call this method alone to forcefully dispose
+  /// all instances at once.
   static Future<void> disposeEnvironment() async {
     return _pluginChannel.invokeMethod('disposeEnvironment');
   }
