@@ -72,6 +72,8 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   /// WebviewController is created/initialized.
   ///
   /// Throws [PlatformException] if the environment was initialized before.
+  /// Use [disposeEnvironment] to reset the environment before re-initializing
+  /// with new parameters.
   static Future<void> initializeEnvironment(
       {String? userDataPath,
       String? browserExePath,
@@ -82,6 +84,18 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       'browserExePath': browserExePath,
       'additionalArguments': additionalArguments
     });
+  }
+
+  /// Disposes the underlying WebView environment and all associated webview
+  /// instances.
+  ///
+  /// After calling this method, you can call [initializeEnvironment] again
+  /// with new parameters (e.g., different Chromium command line arguments).
+  ///
+  /// Make sure all [WebviewController] instances are disposed before
+  /// calling this method, or they will be forcefully disposed.
+  static Future<void> disposeEnvironment() async {
+    return _pluginChannel.invokeMethod('disposeEnvironment');
   }
 
   /// Get the browser version info including channel name if it is not the

@@ -23,6 +23,7 @@ namespace {
 constexpr auto kMethodInitialize = "initialize";
 constexpr auto kMethodDispose = "dispose";
 constexpr auto kMethodInitializeEnvironment = "initializeEnvironment";
+constexpr auto kMethodDisposeEnvironment = "disposeEnvironment";
 constexpr auto kMethodGetWebViewVersion = "getWebViewVersion";
 constexpr auto kMethodCreateHeadless = "createHeadless";
 constexpr auto kMethodDisposeHeadless = "disposeHeadless";
@@ -204,9 +205,16 @@ void WebviewWindowsPlugin::HandleMethodCall(
       }
     }
     return result->Error(kErrorCodeInvalidId);
-  } else {
-    result->NotImplemented();
   }
+
+  if (method_call.method_name().compare(kMethodDisposeEnvironment) == 0) {
+    instances_.clear();
+    headless_instances_.clear();
+    webview_host_.reset();
+    return result->Success();
+  }
+
+  result->NotImplemented();
 }
 
 void WebviewWindowsPlugin::CreateWebviewInstance(
