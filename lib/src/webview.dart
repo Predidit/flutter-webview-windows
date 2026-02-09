@@ -354,9 +354,9 @@ class WebviewController extends ValueNotifier<WebviewValue> {
         _onSourceLoadedStreamController.close();
       } catch (_) {}
 
-      await _pluginChannel.invokeMethod('dispose', _textureId);
-
-      WebViewInstanceTracker.unregister();
+      if (!WebViewInstanceTracker.unregister() && _textureId != 0) {
+        await _pluginChannel.invokeMethod('dispose', _textureId);
+      }
     }
 
     super.dispose();
