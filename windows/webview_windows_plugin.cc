@@ -232,8 +232,8 @@ void WebviewWindowsPlugin::CreateWebviewInstance(
     }
   }
 
-  auto hwnd = CreateWindowEx(WS_EX_TRANSPARENT, window_class_.lpszClassName, L"", 0,
-                             CW_DEFAULT, CW_DEFAULT, 0, 0, HWND_MESSAGE, nullptr,
+  auto hwnd = CreateWindowEx(0, window_class_.lpszClassName, L"", 0, CW_DEFAULT,
+                             CW_DEFAULT, 0, 0, HWND_MESSAGE, nullptr,
                              window_class_.hInstance, nullptr);
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
@@ -285,8 +285,8 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
   }
 
   // Create a hidden window for the headless webview
-  auto hwnd = CreateWindowEx(WS_EX_TRANSPARENT, window_class_.lpszClassName, L"", 0,
-                             CW_DEFAULT, CW_DEFAULT, 0, 0, HWND_MESSAGE, nullptr,
+  auto hwnd = CreateWindowEx(0, window_class_.lpszClassName, L"", 0, CW_DEFAULT,
+                             CW_DEFAULT, 0, 0, HWND_MESSAGE, nullptr,
                              window_class_.hInstance, nullptr);
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
