@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart';
 
 import 'enums.dart';
 import 'cursor.dart';
+import 'webview_instance_tracker.dart';
 
 class HistoryChanged {
   final bool canGoBack;
@@ -87,16 +88,10 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   }
 
   /// Disposes the underlying WebView environment and all associated webview
-  /// instances. This performs the most complete cleanup, releasing all native
-  /// resources including the WebView2 environment itself.
-  ///
-  /// After calling this method, you can call [initializeEnvironment] again
-  /// with new parameters (e.g., different Chromium command line arguments).
-  ///
-  /// Do not call this method while simultaneously calling [dispose]
-  /// on individual [WebviewController] instances, as this may cause resource
-  /// contention and lead to crashes. Call this method alone to forcefully dispose
-  /// all instances at once.
+  /// instances. This is managed automatically by [WebViewInstanceTracker] and
+  /// should not be called directly. Use [dispose] on individual instances
+  /// instead; the environment will be cleaned up when the last instance
+  /// is disposed.
   static Future<void> disposeEnvironment() async {
     return _pluginChannel.invokeMethod('disposeEnvironment');
   }
@@ -296,6 +291,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
         throw MissingPluginException('Unknown method ${call.method}');
       });
 
+      WebViewInstanceTracker.register();
       value = value.copyWith(isInitialized: true);
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
@@ -357,6 +353,8 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       } catch (_) {}
 
       await _pluginChannel.invokeMethod('dispose', _textureId);
+
+      WebViewInstanceTracker.unregister();
     }
 
     super.dispose();
