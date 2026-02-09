@@ -231,6 +231,17 @@ bool Webview::CreateSurface(
 
   webview_controller_->put_IsVisible(true);
 
+  // For headless webviews, set bounds to off-screen with reasonable size
+  // to prevent input capture while maintaining proper viewport dimensions
+  if (is_headless) {
+    RECT bounds;
+    bounds.left = -32000;
+    bounds.top = -32000;
+    bounds.right = -32000 + 1280;
+    bounds.bottom = -32000 + 720;
+    webview_controller_->put_Bounds(bounds);
+  }
+
   return true;
 }
 
