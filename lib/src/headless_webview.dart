@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import 'enums.dart';
+import 'webview_instance_tracker.dart';
 
 typedef HeadlessPermissionRequestedDelegate
     = FutureOr<WebviewPermissionDecision> Function(
@@ -154,6 +155,7 @@ class HeadlessWebview {
         throw MissingPluginException('Unknown method ${call.method}');
       });
 
+      WebViewInstanceTracker.register();
       _value = _value.copyWith(isInitialized: true, isRunning: true);
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
@@ -276,7 +278,7 @@ class HeadlessWebview {
       _onSourceLoadedStreamController.close();
     } catch (_) {}
 
-    if (_webviewId.isNotEmpty) {
+    if (!await WebViewInstanceTracker.unregister() && _webviewId.isNotEmpty) {
       await _pluginChannel.invokeMethod('disposeHeadless', _webviewId);
     }
   }
