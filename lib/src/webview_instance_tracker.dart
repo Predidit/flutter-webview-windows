@@ -21,13 +21,13 @@ class WebViewInstanceTracker {
   /// Returns `true` if environment was disposed (last instance).
   /// Caller should skip individual dispose when this returns `true`,
   /// as [WebviewController.disposeEnvironment] already handles cleanup.
-  static bool unregister() {
+  static Future<bool> unregister() async {
     if (_activeInstanceCount <= 0) return false;
     _activeInstanceCount--;
     debugPrint('WebViewInstanceTracker: unregister, active instances: $_activeInstanceCount');
     if (_activeInstanceCount == 0) {
       debugPrint('WebViewInstanceTracker: all instances disposed, resetting environment');
-      WebviewController.disposeEnvironment();
+      await WebviewController.disposeEnvironment();
       return true;
     }
     return false;

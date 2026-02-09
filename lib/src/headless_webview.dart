@@ -278,7 +278,7 @@ class HeadlessWebview {
       _onSourceLoadedStreamController.close();
     } catch (_) {}
 
-    if (!WebViewInstanceTracker.unregister() && _webviewId.isNotEmpty) {
+    if (!await WebViewInstanceTracker.unregister() && _webviewId.isNotEmpty) {
       await _pluginChannel.invokeMethod('disposeHeadless', _webviewId);
     }
   }
