@@ -64,27 +64,28 @@ class WebviewValue {
 
 /// Controls a WebView and provides streams for various change events.
 class WebviewController extends ValueNotifier<WebviewValue> {
+  static bool _environmentInitialized = false;
+
   /// Explicitly initializes the underlying WebView environment
   /// using  an optional [browserExePath], an optional [userDataPath]
   /// and optional Chromium command line arguments [additionalArguments].
   ///
   /// The environment is shared between all WebviewController instances and
-  /// can be initialized only once. Initialization must take place before any
-  /// WebviewController is created/initialized.
-  ///
-  /// Throws [PlatformException] if the environment was initialized before.
-  /// Use [disposeEnvironment] to reset the environment before re-initializing
-  /// with new parameters.
+  /// is initialized only once. Subsequent calls are silently ignored.
+  /// The environment is automatically disposed when all instances are
+  /// destroyed, after which it can be re-initialized with new parameters.
   static Future<void> initializeEnvironment(
       {String? userDataPath,
       String? browserExePath,
       String? additionalArguments}) async {
-    return _pluginChannel
+    if (_environmentInitialized) return;
+    await _pluginChannel
         .invokeMethod('initializeEnvironment', <String, dynamic>{
       'userDataPath': userDataPath,
       'browserExePath': browserExePath,
       'additionalArguments': additionalArguments
     });
+    _environmentInitialized = true;
   }
 
   /// Disposes the underlying WebView environment and all associated webview
@@ -93,7 +94,8 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   /// instead; the environment will be cleaned up when the last instance
   /// is disposed.
   static Future<void> disposeEnvironment() async {
-    return _pluginChannel.invokeMethod('disposeEnvironment');
+    await _pluginChannel.invokeMethod('disposeEnvironment');
+    _environmentInitialized = false;
   }
 
   /// Get the browser version info including channel name if it is not the

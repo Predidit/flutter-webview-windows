@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'webview.dart';
 
 /// Internal tracker for active WebView instance count.
@@ -13,12 +15,15 @@ class WebViewInstanceTracker {
 
   static void register() {
     _activeInstanceCount++;
+    debugPrint('WebViewInstanceTracker: register, active instances: $_activeInstanceCount');
   }
 
   static void unregister() {
     if (_activeInstanceCount <= 0) return;
     _activeInstanceCount--;
+    debugPrint('WebViewInstanceTracker: unregister, active instances: $_activeInstanceCount');
     if (_activeInstanceCount == 0) {
+      debugPrint('WebViewInstanceTracker: all instances disposed, resetting environment');
       WebviewController.disposeEnvironment();
     }
   }
