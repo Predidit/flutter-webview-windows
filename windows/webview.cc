@@ -671,10 +671,10 @@ void Webview::GetCookies(const std::string& url, GetCookiesCallback callback) {
                     cookie->get_Name(&name_ptr);
                     LPWSTR value_ptr;
                     cookie->get_Value(&value_ptr);
-                    result.append(name_ptr + std::wstring(L"="));
-                    result.append(value_ptr + std::wstring(L";"));
-                    // std::wcout << L"cookie:" << name_ptr << L"=" << value_ptr
-                    //           << ";\n";
+                    if (i > 0) {
+                      result.append(L"; ");
+                    }
+                    result.append(name_ptr + std::wstring(L"=") + value_ptr);
                   }
                   // std::wcout << L"cookies:" << result;
                   callback(SUCCEEDED(error_code), util::Utf8FromUtf16(result));
