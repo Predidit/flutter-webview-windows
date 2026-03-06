@@ -39,6 +39,22 @@ constexpr auto kErrorUnsupportedPlatform = "unsupported_platform";
 // Window procedure for headless debug windows
 LRESULT CALLBACK HeadlessDebugWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
+    case WM_ACTIVATE:
+      // Force activation when window is clicked
+      if (LOWORD(wParam) != WA_INACTIVE) {
+        SetForegroundWindow(hwnd);
+        SetFocus(hwnd);
+        BringWindowToTop(hwnd);
+      }
+      return 0;
+    case WM_MOUSEACTIVATE:
+      // Activate on mouse click
+      SetForegroundWindow(hwnd);
+      SetFocus(hwnd);
+      return MA_ACTIVATE;
+    case WM_NCACTIVATE:
+      // Allow non-client activation
+      return DefWindowProc(hwnd, msg, wParam, lParam);
     case WM_CLOSE:
       // Don't close, just hide for now
       ShowWindow(hwnd, SW_HIDE);
@@ -136,14 +152,17 @@ WebviewWindowsPlugin::WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
   RegisterClass(&window_class_);
   
   // Register window class for headless debug windows
+  ZeroMemory(&headless_debug_window_class_, sizeof(WNDCLASSEX));
   headless_debug_window_class_.cbSize = sizeof(WNDCLASSEX);
-  headless_debug_window_class_.style = CS_HREDRAW | CS_VREDRAW;
+  headless_debug_window_class_.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
   headless_debug_window_class_.lpfnWndProc = HeadlessDebugWindowProc;
   headless_debug_window_class_.hInstance = hInstance;
   headless_debug_window_class_.hCursor = LoadCursor(nullptr, IDC_ARROW);
-  headless_debug_window_class_.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+  headless_debug_window_class_.hbrBackground = CreateSolidBrush(RGB(240, 240, 240));
   headless_debug_window_class_.lpszClassName = L"FlutterWebviewHeadlessDebug";
-  RegisterClassEx(&headless_debug_window_class_);
+  if (!RegisterClassEx(&headless_debug_window_class_)) {
+    // Log error but don't fail - will handle at window creation
+  }
 }
 
 WebviewWindowsPlugin::~WebviewWindowsPlugin() {
@@ -314,55 +333,33 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
     }
   }
 
-  // Create a visible window for the headless webview (for debugging)
-  // Use dedicated window class and WS_EX_APPWINDOW for independent taskbar entry
+  // Create a visible standalone window for the headless webview (for debugging)
   auto hwnd = CreateWindowEx(
-      WS_EX_APPWINDOW | WS_EX_WINDOWEDGE,
+      WS_EX_APPWINDOW,  // Independent taskbar button
       headless_debug_window_class_.lpszClassName,
       L"Headless WebView (Debug)",
-      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-      CW_DEFAULT, CW_DEFAULT, 1280, 720,
-      nullptr,  // No parent window
+      WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Visible from start
+      CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720,
+      nullptr,  // No parent
       nullptr,  // No menu
       headless_debug_window_class_.hInstance,
       nullptr);
   
-  // Forcefully show and activate the window
-  if (hwnd) {
-    // First, show the window normally
-    ShowWindow(hwnd, SW_SHOWNORMAL);
-    UpdateWindow(hwnd);
-    
-    // Allow this process to set foreground window
-    DWORD currentProcessId = GetCurrentProcessId();
-    AllowSetForegroundWindow(currentProcessId);
-    
-    // Attach to the foreground window's input thread to gain foreground rights
-    HWND foregroundWnd = GetForegroundWindow();
-    if (foregroundWnd) {
-      DWORD foregroundThreadId = GetWindowThreadProcessId(foregroundWnd, nullptr);
-      DWORD currentThreadId = GetCurrentThreadId();
-      if (foregroundThreadId != currentThreadId) {
-        AttachThreadInput(currentThreadId, foregroundThreadId, TRUE);
-        BringWindowToTop(hwnd);
-        SetForegroundWindow(hwnd);
-        SetFocus(hwnd);
-        AttachThreadInput(currentThreadId, foregroundThreadId, FALSE);
-      } else {
-        BringWindowToTop(hwnd);
-        SetForegroundWindow(hwnd);
-        SetFocus(hwnd);
-      }
-    } else {
-      // No foreground window, just try directly
-      BringWindowToTop(hwnd);
-      SetForegroundWindow(hwnd);
-      SetFocus(hwnd);
-    }
-    
-    // Make sure it's the active window
-    SetActiveWindow(hwnd);
+  if (!hwnd) {
+    DWORD error = GetLastError();
+    return result->Error(kErrorCodeWebviewCreationFailed,
+                        std::format("Failed to create debug window: {}", error));
   }
+  
+  // Ensure window is shown and painted
+  ShowWindow(hwnd, SW_SHOWNORMAL);
+  UpdateWindow(hwnd);
+  EnableWindow(hwnd, TRUE);  // Ensure window is enabled
+  
+  // Bring to foreground (will work if user interacts or within timeout)
+  SwitchToThisWindow(hwnd, TRUE);
+  SetForegroundWindow(hwnd);
+  BringWindowToTop(hwnd);
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
       shared_result = std::move(result);
@@ -384,8 +381,13 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
 
         // Try again to bring window to foreground after webview is created
         if (hwnd && IsWindow(hwnd)) {
+          // Use SetWindowPos to force window to top
+          SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
           SetForegroundWindow(hwnd);
           SetFocus(hwnd);
+          SetActiveWindow(hwnd);
+          BringWindowToTop(hwnd);
         }
 
         auto bridge = std::make_unique<HeadlessWebviewBridge>(
