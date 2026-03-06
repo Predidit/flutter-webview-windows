@@ -36,6 +36,20 @@ constexpr auto kErrorCodeEnvironmentAlreadyInitialized =
 constexpr auto kErrorCodeWebviewCreationFailed = "webview_creation_failed";
 constexpr auto kErrorUnsupportedPlatform = "unsupported_platform";
 
+// Window procedure for headless debug windows
+LRESULT CALLBACK HeadlessDebugWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+  switch (msg) {
+    case WM_CLOSE:
+      // Don't close, just hide for now
+      ShowWindow(hwnd, SW_HIDE);
+      return 0;
+    case WM_DESTROY:
+      return 0;
+    default:
+      return DefWindowProc(hwnd, msg, wParam, lParam);
+  }
+}
+
 template <typename T>
 std::optional<T> GetOptionalValue(const flutter::EncodableMap& map,
                                   const std::string& key) {
@@ -65,6 +79,7 @@ class WebviewWindowsPlugin : public flutter::Plugin {
   std::unordered_map<std::string, std::unique_ptr<HeadlessWebviewBridge>> headless_instances_;
 
   WNDCLASS window_class_ = {};
+  WNDCLASSEX headless_debug_window_class_ = {};
   flutter::TextureRegistrar* textures_;
   flutter::BinaryMessenger* messenger_;
 
@@ -112,16 +127,30 @@ void WebviewWindowsPlugin::RegisterWithRegistrar(
 WebviewWindowsPlugin::WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
                                            flutter::BinaryMessenger* messenger)
     : textures_(textures), messenger_(messenger) {
+  HINSTANCE hInstance = GetModuleHandle(nullptr);
+  
+  // Register window class for message windows
   window_class_.lpszClassName = L"FlutterWebviewMessage";
   window_class_.lpfnWndProc = &DefWindowProc;
-  window_class_.hInstance = GetModuleHandle(nullptr);
+  window_class_.hInstance = hInstance;
   RegisterClass(&window_class_);
+  
+  // Register window class for headless debug windows
+  headless_debug_window_class_.cbSize = sizeof(WNDCLASSEX);
+  headless_debug_window_class_.style = CS_HREDRAW | CS_VREDRAW;
+  headless_debug_window_class_.lpfnWndProc = HeadlessDebugWindowProc;
+  headless_debug_window_class_.hInstance = hInstance;
+  headless_debug_window_class_.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  headless_debug_window_class_.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+  headless_debug_window_class_.lpszClassName = L"FlutterWebviewHeadlessDebug";
+  RegisterClassEx(&headless_debug_window_class_);
 }
 
 WebviewWindowsPlugin::~WebviewWindowsPlugin() {
   instances_.clear();
   headless_instances_.clear();
   UnregisterClass(window_class_.lpszClassName, nullptr);
+  UnregisterClass(headless_debug_window_class_.lpszClassName, nullptr);
 }
 
 void WebviewWindowsPlugin::HandleMethodCall(
@@ -286,39 +315,53 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
   }
 
   // Create a visible window for the headless webview (for debugging)
-  // Use WS_EX_APPWINDOW to ensure it appears in the taskbar independently
+  // Use dedicated window class and WS_EX_APPWINDOW for independent taskbar entry
   auto hwnd = CreateWindowEx(
       WS_EX_APPWINDOW | WS_EX_WINDOWEDGE,
-      window_class_.lpszClassName,
+      headless_debug_window_class_.lpszClassName,
       L"Headless WebView (Debug)",
       WS_OVERLAPPEDWINDOW | WS_VISIBLE,
       CW_DEFAULT, CW_DEFAULT, 1280, 720,
       nullptr,  // No parent window
       nullptr,  // No menu
-      window_class_.hInstance,
+      headless_debug_window_class_.hInstance,
       nullptr);
   
   // Forcefully show and activate the window
   if (hwnd) {
-    // First, show the window
+    // First, show the window normally
     ShowWindow(hwnd, SW_SHOWNORMAL);
     UpdateWindow(hwnd);
     
-    // Try multiple methods to bring window to foreground
-    // Method 1: Standard activation
-    BringWindowToTop(hwnd);
+    // Allow this process to set foreground window
+    DWORD currentProcessId = GetCurrentProcessId();
+    AllowSetForegroundWindow(currentProcessId);
+    
+    // Attach to the foreground window's input thread to gain foreground rights
+    HWND foregroundWnd = GetForegroundWindow();
+    if (foregroundWnd) {
+      DWORD foregroundThreadId = GetWindowThreadProcessId(foregroundWnd, nullptr);
+      DWORD currentThreadId = GetCurrentThreadId();
+      if (foregroundThreadId != currentThreadId) {
+        AttachThreadInput(currentThreadId, foregroundThreadId, TRUE);
+        BringWindowToTop(hwnd);
+        SetForegroundWindow(hwnd);
+        SetFocus(hwnd);
+        AttachThreadInput(currentThreadId, foregroundThreadId, FALSE);
+      } else {
+        BringWindowToTop(hwnd);
+        SetForegroundWindow(hwnd);
+        SetFocus(hwnd);
+      }
+    } else {
+      // No foreground window, just try directly
+      BringWindowToTop(hwnd);
+      SetForegroundWindow(hwnd);
+      SetFocus(hwnd);
+    }
+    
+    // Make sure it's the active window
     SetActiveWindow(hwnd);
-    
-    // Method 2: Use AllowSetForegroundWindow trick
-    // Simulate Alt key to allow setting foreground window
-    keybd_event(VK_MENU, 0, 0, 0);
-    keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
-    
-    SetForegroundWindow(hwnd);
-    SetFocus(hwnd);
-    
-    // Method 3: Force repaint
-    InvalidateRect(hwnd, nullptr, TRUE);
   }
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
