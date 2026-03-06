@@ -30,6 +30,7 @@ constexpr auto kMethodResume = "resume";
 constexpr auto kMethodSetVirtualHostNameMapping = "setVirtualHostNameMapping";
 constexpr auto kMethodClearVirtualHostNameMapping =
     "clearVirtualHostNameMapping";
+constexpr auto kMethodOpenDevTools = "openDevTools";
 constexpr auto kMethodClearCookies = "clearCookies";
 constexpr auto kMethodClearCache = "clearCache";
 constexpr auto kMethodGetCookies = "getCookies";
@@ -441,6 +442,16 @@ void HeadlessWebviewBridge::HandleMethodCall(
       }
     } else {
       result->Error(kErrorInvalidArgs);
+    }
+    return;
+  }
+
+  // openDevTools
+  if (method_name.compare(kMethodOpenDevTools) == 0) {
+    if (webview_->OpenDevTools()) {
+      result->Success();
+    } else {
+      result->Error(kMethodFailed);
     }
     return;
   }

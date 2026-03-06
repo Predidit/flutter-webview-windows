@@ -382,6 +382,14 @@ class HeadlessWebview {
     await _methodChannel.invokeMethod('setUserAgent', userAgent);
   }
 
+  /// Opens the Browser DevTools in a separate window
+  Future<void> openDevTools() async {
+    if (_isDisposed || !_value.isRunning) {
+      throw StateError('HeadlessWebview is not running');
+    }
+    await _methodChannel.invokeMethod('openDevTools');
+  }
+
   /// Clears browser cookies.
   Future<void> clearCookies() async {
     if (_isDisposed || !_value.isRunning) {
