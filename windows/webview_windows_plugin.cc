@@ -114,6 +114,7 @@ WebviewWindowsPlugin::WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
     : textures_(textures), messenger_(messenger) {
   window_class_.lpszClassName = L"FlutterWebviewMessage";
   window_class_.lpfnWndProc = &DefWindowProc;
+  window_class_.hInstance = GetModuleHandle(nullptr);
   RegisterClass(&window_class_);
 }
 
@@ -285,25 +286,46 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
   }
 
   // Create a visible window for the headless webview (for debugging)
-  auto hwnd = CreateWindowEx(0, window_class_.lpszClassName, L"Headless WebView (Debug)",
-                             WS_OVERLAPPEDWINDOW, CW_DEFAULT,
-                             CW_DEFAULT, 1280, 720, nullptr, nullptr,
-                             window_class_.hInstance, nullptr);
+  // Use WS_EX_APPWINDOW to ensure it appears in the taskbar independently
+  auto hwnd = CreateWindowEx(
+      WS_EX_APPWINDOW | WS_EX_WINDOWEDGE,
+      window_class_.lpszClassName,
+      L"Headless WebView (Debug)",
+      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+      CW_DEFAULT, CW_DEFAULT, 1280, 720,
+      nullptr,  // No parent window
+      nullptr,  // No menu
+      window_class_.hInstance,
+      nullptr);
   
-  // Show the window and bring it to the foreground
+  // Forcefully show and activate the window
   if (hwnd) {
+    // First, show the window
     ShowWindow(hwnd, SW_SHOWNORMAL);
     UpdateWindow(hwnd);
+    
+    // Try multiple methods to bring window to foreground
+    // Method 1: Standard activation
     BringWindowToTop(hwnd);
+    SetActiveWindow(hwnd);
+    
+    // Method 2: Use AllowSetForegroundWindow trick
+    // Simulate Alt key to allow setting foreground window
+    keybd_event(VK_MENU, 0, 0, 0);
+    keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+    
     SetForegroundWindow(hwnd);
     SetFocus(hwnd);
+    
+    // Method 3: Force repaint
+    InvalidateRect(hwnd, nullptr, TRUE);
   }
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
       shared_result = std::move(result);
   webview_host_->CreateWebview(
       hwnd, false, true, true,
-      [shared_result, this](std::unique_ptr<Webview> webview,
+      [shared_result, this, hwnd](std::unique_ptr<Webview> webview,
                             std::unique_ptr<WebviewCreationError> error) {
         if (!webview) {
           if (error) {
@@ -315,6 +337,12 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
           }
           return shared_result->Error(kErrorCodeWebviewCreationFailed,
                                       "Creating the headless webview failed.");
+        }
+
+        // Try again to bring window to foreground after webview is created
+        if (hwnd && IsWindow(hwnd)) {
+          SetForegroundWindow(hwnd);
+          SetFocus(hwnd);
         }
 
         auto bridge = std::make_unique<HeadlessWebviewBridge>(
