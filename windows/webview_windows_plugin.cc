@@ -284,15 +284,16 @@ void WebviewWindowsPlugin::CreateHeadlessWebviewInstance(
     }
   }
 
-  // Create a hidden window for the headless webview
-  auto hwnd = CreateWindowEx(0, window_class_.lpszClassName, L"", 0, CW_DEFAULT,
-                             CW_DEFAULT, 0, 0, HWND_MESSAGE, nullptr,
+  // Create a visible window for the headless webview (for debugging)
+  auto hwnd = CreateWindowEx(0, window_class_.lpszClassName, L"Headless WebView (Debug)",
+                             WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_DEFAULT,
+                             CW_DEFAULT, 1280, 720, nullptr, nullptr,
                              window_class_.hInstance, nullptr);
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
       shared_result = std::move(result);
   webview_host_->CreateWebview(
-      hwnd, true, true, true,
+      hwnd, false, true, true,
       [shared_result, this](std::unique_ptr<Webview> webview,
                             std::unique_ptr<WebviewCreationError> error) {
         if (!webview) {
